@@ -6,6 +6,10 @@ android {
     namespace = "com.apimirage.sample"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "com.apimirage.sample"
         minSdk = libs.versions.minSdk.get().toInt()
@@ -44,4 +48,3 @@ dependencies {
 
     testImplementation(libs.junit4)
 }
-
