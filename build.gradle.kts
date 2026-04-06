@@ -24,10 +24,12 @@ tasks.register("closeAndReleaseCentralBundle") {
         val namespace = providers.gradleProperty("POM_GROUP").get()
         val username = providers.gradleProperty("centralPortalUsername")
             .orElse(providers.environmentVariable("CENTRAL_USERNAME"))
+            .map { it.trim() }
             .orNull
             ?: error("Missing Central Portal username. Set centralPortalUsername or CENTRAL_USERNAME.")
         val password = providers.gradleProperty("centralPortalPassword")
             .orElse(providers.environmentVariable("CENTRAL_PASSWORD"))
+            .map { it.trim() }
             .orNull
             ?: error("Missing Central Portal password. Set centralPortalPassword or CENTRAL_PASSWORD.")
 

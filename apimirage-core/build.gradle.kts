@@ -38,12 +38,15 @@ dependencies {
 
 val centralPortalUsername = providers.gradleProperty("centralPortalUsername")
     .orElse(providers.environmentVariable("CENTRAL_USERNAME"))
+    .map { it.trim() }
 val centralPortalPassword = providers.gradleProperty("centralPortalPassword")
     .orElse(providers.environmentVariable("CENTRAL_PASSWORD"))
+    .map { it.trim() }
 val signingKey = providers.gradleProperty("signingKey")
     .orElse(providers.environmentVariable("SIGNING_KEY"))
 val signingPassword = providers.gradleProperty("signingPassword")
     .orElse(providers.environmentVariable("SIGNING_PASSWORD"))
+    .map { it.trim() }
 val isCentralPublishRequested = gradle.startParameter.taskNames.any { taskName ->
     taskName.contains("CentralPortal", ignoreCase = true) ||
         taskName.contains("closeAndReleaseCentralBundle", ignoreCase = true)

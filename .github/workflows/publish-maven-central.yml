@@ -16,6 +16,7 @@ jobs:
       ORG_GRADLE_PROJECT_centralPortalPassword: ${{ secrets.CENTRAL_PASSWORD }}
       ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
       ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+      CENTRAL_NAMESPACE: io.github.muzafferus
 
     steps:
       - name: Check out source
@@ -36,6 +37,17 @@ jobs:
       - name: Verify tests
         run: ./gradlew :apimirage-core:testDebugUnitTest :apimirage-retrofit:testDebugUnitTest :sample-app:testDebugUnitTest
 
+      - name: Verify Sonatype token and namespace access
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+        run: |
+          set -euo pipefail
+          TOKEN="$(printf "%s:%s" "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | base64 -w 0)"
+          curl --fail --show-error --silent \
+            -H "Authorization: Bearer $TOKEN" \
+            "https://ossrh-staging-api.central.sonatype.com/service/local/manual/search/repositories?ip=any&profile_id=${CENTRAL_NAMESPACE}"
+
       - name: Publish release artifacts to Sonatype staging compatibility endpoint
         env:
           RELEASE_VERSION: ${{ github.ref_name }}
@@ -46,4 +58,5 @@ jobs:
             :apimirage-core:publishReleasePublicationToCentralPortalRepository \
             :apimirage-retrofit:publishReleasePublicationToCentralPortalRepository \
             closeAndReleaseCentralBundle \
+            --info \
             --stacktrace
