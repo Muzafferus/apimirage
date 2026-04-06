@@ -1,10 +1,31 @@
 # ApiMirage
 
-ApiMirage is a Kotlin-first Android mocking library for Retrofit apps.
+ApiMirage is a Kotlin-first Android library for in-process Retrofit mocking.
 
-When ApiMirage is enabled, it intercepts outgoing Retrofit requests inside the app process, resolves the declared response type, generates a realistic mock object, serializes it to JSON, and returns a synthetic HTTP 200 response so Retrofit parses it as if it came from the backend.
+It intercepts outgoing Retrofit requests before the real network call, resolves the declared response type, generates realistic mock data, serializes it to JSON, and returns a synthetic HTTP 200 response so Retrofit parses it exactly like a backend response.
 
-The MVP keeps the public API intentionally small:
+No mock server. No proxy. No fake API environment to keep running.
+
+## Why ApiMirage
+
+- Drop-in Retrofit support through an OkHttp application interceptor
+- Tiny public API with build-type-aware defaults
+- Realistic, non-empty JSON payloads generated inside the app process
+- Deterministic fake data when you provide a seed
+- Safe fallback to the real network when mocking is disabled or unsupported
+- Designed so future adapters can support Ktor and Apollo without rewriting the core engine
+
+## What It Looks Like
+
+```kotlin
+ApiMirage.install()
+
+val client = OkHttpClient.Builder()
+    .addInterceptor(ApiMirageInterceptor())
+    .build()
+```
+
+If you want explicit control:
 
 ```kotlin
 ApiMirage.install(enabled = BuildConfig.DEBUG)
@@ -13,49 +34,50 @@ ApiMirage.install(enabled = BuildConfig.DEBUG)
 or:
 
 ```kotlin
-OkHttpClient.Builder()
-    .addInterceptor(ApiMirageInterceptor(enabled = BuildConfig.DEBUG))
-    .build()
+ApiMirage.install(
+    ApiMirageConfig(
+        enabled = BuildConfig.DEBUG,
+        seed = 20260407L,
+        diagnostics = ApiMirageDiagnostics.LOGS,
+    ),
+)
 ```
-
-If ApiMirage is disabled, requests pass through to the real network with no behavior change.
 
 ## Status
 
-- Retrofit is the only supported adapter in v1.
-- Debug builds default to ON.
-- Release builds default to OFF.
-- No external mock server is required.
-- Deterministic mock data is supported with a seed.
+ApiMirage is currently an MVP with Retrofit support only.
 
-## Module Structure
-
-| Module | Purpose |
-| --- | --- |
-| `:apimirage-core` | Adapter-agnostic config, generation engine, fake value providers, seed support, annotations, and extension hooks. |
-| `:apimirage-retrofit` | Retrofit integration through an OkHttp application interceptor, `Invocation` inspection, response type resolution, diagnostics, and synthetic HTTP response creation. |
-| `:sample-app` | Small demo app that proves `UserDto`, `List<UserDto>`, and `BaseResponse<UserDto>` flows end to end. |
-
-The structure is designed so future adapters can live beside Retrofit without pulling generation logic out of `:apimirage-core`.
-
-Possible future modules:
-
-- `:apimirage-ktor`
-- `:apimirage-apollo`
+- Debug builds default to ON
+- Release builds default to OFF
+- Retrofit requests pass through unchanged when ApiMirage is disabled
+- The repository includes a sample app and unit coverage for the core flow
+- Publishing to Maven is not set up yet, so current integration is via local modules
 
 ## How It Works
 
 1. `ApiMirageInterceptor` runs as an OkHttp application interceptor.
 2. It reads Retrofit metadata from `request.tag(Invocation::class.java)`.
-3. It resolves the real body type behind declarations such as `Call<T>`, `Response<T>`, and suspend functions.
-4. It generates a realistic object for that resolved type.
-5. It serializes the generated object to JSON, preferring `kotlinx.serialization`.
-6. It returns a synthetic `okhttp3.Response` with HTTP 200 and `application/json`.
-7. Retrofit keeps using its normal converter stack, so parsing behavior stays realistic.
+3. It resolves the actual body type behind `Call<T>`, `Response<T>`, suspend functions, lists, and wrapper models.
+4. It generates a realistic mock object for that resolved type.
+5. It serializes the object to JSON, preferring `kotlinx.serialization`.
+6. It returns a synthetic `okhttp3.Response` with HTTP 200 and JSON.
+7. Retrofit keeps using its normal converters, so your parsing path stays real.
+
+## Module Structure
+
+| Module | Purpose |
+| --- | --- |
+| `:apimirage-core` | Config, mock generation engine, fake value providers, annotations, deterministic seed support, and extension hooks |
+| `:apimirage-retrofit` | OkHttp interceptor, Retrofit `Invocation` reader, response type resolver, diagnostics, and synthetic response creation |
+| `:sample-app` | Small demo app proving `UserDto`, `List<UserDto>`, and `BaseResponse<UserDto>` end to end |
+
+This split is intentional: the generation engine lives in `:apimirage-core`, while transport-specific integrations live in adapter modules.
 
 ## Quick Start
 
-Right now ApiMirage is set up as a multi-module project, so the simplest integration is a local module dependency.
+### 1. Add the module
+
+Right now the project is set up as local modules:
 
 ```kotlin
 dependencies {
@@ -63,27 +85,31 @@ dependencies {
 }
 ```
 
-`:apimirage-retrofit` already depends on `:apimirage-core`, so most apps only need the Retrofit module directly.
+`:apimirage-retrofit` already depends on `:apimirage-core`.
 
-Install ApiMirage once during app startup:
+### 2. Install ApiMirage
+
+Use the build-type-aware default:
 
 ```kotlin
-import com.apimirage.core.ApiMirage
+ApiMirage.install()
+```
 
+Or be explicit:
+
+```kotlin
 ApiMirage.install(enabled = BuildConfig.DEBUG)
 ```
 
-Add the interceptor to the same `OkHttpClient` used by Retrofit:
+### 3. Add the interceptor to OkHttp
 
 ```kotlin
-import com.apimirage.retrofit.ApiMirageInterceptor
-
 val okHttpClient = OkHttpClient.Builder()
     .addInterceptor(ApiMirageInterceptor())
     .build()
 ```
 
-Build Retrofit as usual:
+### 4. Build Retrofit as usual
 
 ```kotlin
 val retrofit = Retrofit.Builder()
@@ -93,35 +119,23 @@ val retrofit = Retrofit.Builder()
     .build()
 ```
 
-That is enough for Retrofit requests to be auto-mocked when ApiMirage is enabled.
+That is enough to let Retrofit receive synthetic JSON responses when mocking is enabled.
 
-## Tiny Config API
+## Public API
 
-Use the boolean shortcut when all you need is on or off:
+The MVP keeps the public API intentionally small.
 
 ```kotlin
+ApiMirage.install()
 ApiMirage.install(enabled = BuildConfig.DEBUG)
+ApiMirage.install(ApiMirageConfig(...))
 ```
 
-Use `ApiMirageConfig` when you want deterministic data or debug diagnostics:
+`ApiMirageConfig` currently contains:
 
-```kotlin
-import com.apimirage.core.ApiMirage
-import com.apimirage.core.ApiMirageConfig
-import com.apimirage.core.ApiMirageDiagnostics
-
-ApiMirage.install(
-    ApiMirageConfig(
-        enabled = BuildConfig.DEBUG,
-        seed = 20260407L,
-        diagnostics = if (BuildConfig.DEBUG) {
-            ApiMirageDiagnostics.LOGS
-        } else {
-            ApiMirageDiagnostics.NONE
-        },
-    ),
-)
-```
+- `enabled`
+- `seed`
+- `diagnostics`
 
 Defaults:
 
@@ -130,20 +144,20 @@ Defaults:
 
 ## Supported Retrofit Declarations in v1
 
-ApiMirage currently resolves and mocks these Retrofit response shapes:
+ApiMirage currently resolves and mocks:
 
 - `Call<T>`
 - `Response<T>`
 - `suspend fun ... : T`
 - `suspend fun ... : Response<T>`
 - `List<T>`
-- nested wrappers such as `BaseResponse<T>`
+- nested wrappers such as `BaseResponse<UserDto>`
 
 The resolved body type is what gets generated and serialized.
 
 ## Supported Model Shapes in v1
 
-The generator currently supports:
+The generation engine currently supports:
 
 - primitives
 - `String`
@@ -154,10 +168,10 @@ The generator currently supports:
 - nested Kotlin data classes
 - lists
 - maps with JSON-safe keys
-- generic wrapper models such as `BaseResponse<UserDto>`
+- generic wrappers such as `BaseResponse<T>`
 - common date/time string fields
 
-Field-name heuristics currently produce sensible fake values for names such as:
+Built-in field heuristics cover names such as:
 
 - `id`
 - `name`
@@ -169,29 +183,29 @@ Field-name heuristics currently produce sensible fake values for names such as:
 - `createdAt`
 - `updatedAt`
 
-Typical outputs include:
+Examples of the kind of values ApiMirage emits:
 
-- numeric IDs for numeric `id` fields
-- stable-looking string IDs for string `id` fields
 - full names like `Avery Nguyen`
 - emails like `avery.nguyen42@example.com`
 - URLs like `https://example.com/profile/abc123`
 - ISO-8601 timestamps for `createdAt` and `updatedAt`
+- numeric IDs for numeric identifier fields
 
-List generation returns at least 3 items in the MVP.
+Lists return at least 3 items in the MVP.
 
 ## Serialization Strategy
 
-ApiMirage uses a two-step JSON encoding strategy:
+ApiMirage uses a Kotlin-first encoding path:
 
-1. Try `kotlinx.serialization` first.
-2. If no serializer is available, fall back to a reflective `JsonElement` encoder for supported v1 shapes.
+1. Try `kotlinx.serialization`
+2. Fall back to a reflective `JsonElement` encoder for supported data-class shapes
+3. If a shape still cannot be encoded safely, pass through to the real network or emit a debug diagnostic
 
-This keeps the happy path Kotlin-first while still handling common data-class models without forcing every DTO to be annotated.
+This keeps the happy path clean while still supporting common non-annotated DTOs.
 
 ## Deterministic Seed Support
 
-When a seed is provided, mock data is deterministic.
+Provide a seed to make generated responses repeatable:
 
 ```kotlin
 ApiMirage.install(
@@ -204,25 +218,34 @@ ApiMirage.install(
 
 Current behavior:
 
-- the same seed produces the same data across runs
+- the same seed produces the same values across runs
 - the same seed and the same endpoint produce the same payload
 - different endpoints still diverge because ApiMirage forks the random source using stable endpoint metadata
 
-This is useful for repeatable UI screenshots, snapshot tests, QA flows, and debugging.
+This is useful for repeatable screenshots, QA flows, UI testing, and debugging.
 
-## Debug Logging and Fallback Behavior
+## Debug Logging and Safe Fallback
 
-Set `diagnostics = ApiMirageDiagnostics.LOGS` to see what ApiMirage is doing.
+Enable logs with:
 
-Current logs include:
+```kotlin
+ApiMirage.install(
+    ApiMirageConfig(
+        enabled = true,
+        diagnostics = ApiMirageDiagnostics.LOGS,
+    ),
+)
+```
+
+Current logs tell you:
 
 - which endpoint was intercepted
 - which response model was resolved
-- whether a mock response was returned
-- whether pass-through happened
+- whether a synthetic mock response was returned
+- whether the request passed through
 - why a fallback happened
 
-Typical examples:
+Example:
 
 ```text
 [ApiMirage] Resolved response model UserDto for GET https://example.com/user.
@@ -232,52 +255,44 @@ Typical examples:
 
 Fail-safe behavior in v1:
 
-- if mocking is disabled, ApiMirage always passes through
-- if Retrofit `Invocation` metadata is missing, ApiMirage passes through
-- if a response type cannot be resolved, ApiMirage passes through
-- if generation or encoding cannot safely support a shape, ApiMirage passes through
-- when diagnostics are on, ApiMirage logs the reason before passing through
+- if mocking is disabled, requests always pass through
+- if Retrofit `Invocation` metadata is missing, requests pass through
+- if response type resolution fails, requests pass through
+- if mock generation fails safely, requests pass through
+- if JSON encoding fails safely, requests pass through
 
-## Endpoint-Level Controls and Extension Hooks
+When diagnostics are enabled, ApiMirage logs the reason before passing through.
 
-### Opt out of auto-mocking
+## Extension Hooks
 
-Use `@NoAutoMock` on a Retrofit service or endpoint:
+The main API stays small, but the core already includes early extension points for future growth.
+
+### `@NoAutoMock`
+
+Opt a service or endpoint out of automatic mocking:
 
 ```kotlin
-import com.apimirage.core.annotations.NoAutoMock
-
-interface UserApi {
-    @NoAutoMock
-    @GET("user/live")
-    fun liveUser(): Call<UserDto>
-}
+@NoAutoMock
+@GET("user/live")
+fun liveUser(): Call<UserDto>
 ```
 
-### Override inferred field hints
+### `@ApiMirageFieldHint`
 
-Use `@ApiMirageFieldHint` when a property name alone is not enough:
+Override inferred field semantics when property names are not enough:
 
 ```kotlin
-import com.apimirage.core.annotations.ApiMirageFieldHint
-import com.apimirage.core.fake.ApiMirageValueHint
-
 data class ContactDto(
     @ApiMirageFieldHint(ApiMirageValueHint.PHONE)
     val supportLine: String,
 )
 ```
 
-### Register a custom fake value provider
+### Custom fake value providers
 
 ```kotlin
-import com.apimirage.core.ApiMirage
-import com.apimirage.core.fake.ApiMirageFakeValueProvider
-import com.apimirage.core.fake.ApiMirageFakeValueRequest
-import com.apimirage.core.fake.ApiMirageFakeValueResult
-
 ApiMirage.registerFakeValueProvider(
-    ApiMirageFakeValueProvider { request: ApiMirageFakeValueRequest ->
+    ApiMirageFakeValueProvider { request ->
         if (request.property.declaredName == "name") {
             ApiMirageFakeValueResult.Provided("Custom Name")
         } else {
@@ -287,12 +302,9 @@ ApiMirage.registerFakeValueProvider(
 )
 ```
 
-### Register a per-endpoint override
+### Per-endpoint overrides
 
 ```kotlin
-import com.apimirage.core.ApiMirage
-import com.apimirage.core.generation.ApiMirageGenerationResult
-
 ApiMirage.registerEndpointOverride { request ->
     if (request.endpoint.operationName == "user") {
         ApiMirageGenerationResult.Success(
@@ -307,7 +319,7 @@ ApiMirage.registerEndpointOverride { request ->
 }
 ```
 
-Clear registered customizations:
+Clear customizations:
 
 ```kotlin
 ApiMirage.clearCustomizations()
@@ -315,13 +327,13 @@ ApiMirage.clearCustomizations()
 
 ## Sample App
 
-The sample app demonstrates three acceptance flows:
+The sample app demonstrates the MVP acceptance path with:
 
 - `Call<UserDto>`
 - `Call<List<UserDto>>`
 - `Call<BaseResponse<UserDto>>`
 
-The sample installs ApiMirage with a deterministic seed and displays parsed results in a simple on-device UI.
+It installs ApiMirage with a deterministic seed and shows parsed results in a simple Android UI.
 
 Useful commands:
 
@@ -330,14 +342,14 @@ Useful commands:
 ./gradlew :sample-app:testDebugUnitTest
 ```
 
-## Test Coverage
+## Tests
 
-Current tests cover:
+Current automated coverage includes:
 
 - Retrofit response type resolution
 - mock generation rules
 - deterministic seed behavior
-- pass-through behavior when disabled
+- disabled-mode pass-through
 - interceptor integration with synthetic HTTP 200 responses
 - sample-app end-to-end parsing
 
@@ -349,42 +361,46 @@ Useful command:
 
 ## Unsupported or Postponed in v1
 
-These areas are intentionally out of scope for the MVP or only partially handled today:
+The MVP intentionally does not try to solve everything yet.
+
+Postponed or only partially handled today:
 
 - Ktor adapter support
 - Apollo / GraphQL adapter support
-- polymorphic model graphs
-- sealed hierarchies and abstract types as primary DTO shapes
-- arbitrary interface-based models
+- polymorphic DTO graphs
+- sealed hierarchies and abstract root models
+- arbitrary interface-based response models
 - cyclic object graphs
 - very deep recursive shapes beyond the current safety limit
-- custom Java or Kotlin time object types such as `Instant`, `LocalDate`, or `OffsetDateTime` as direct DTO fields
-- array-focused APIs as a primary supported shape
+- direct support for time objects such as `Instant`, `LocalDate`, or `OffsetDateTime`
 - remote mock servers or proxy infrastructure
-- rich per-endpoint DSLs or scenario scripting
+- rich scenario scripting or endpoint DSLs
 
-If a shape is unsupported, ApiMirage is designed to fail safely by passing through to the real network instead of breaking the request pipeline.
+If a shape is unsupported, ApiMirage is designed to fail safely and fall back to the real network instead of breaking the request pipeline.
 
 ## Roadmap
 
-Near-term improvements:
+Near term:
 
 - publish artifacts for easier external consumption
 - expand fake value heuristics and field annotations
-- improve diagnostics around unsupported models
-- add more per-endpoint override ergonomics
+- improve diagnostics around unsupported shapes
+- add more ergonomic endpoint override APIs
 - add instrumentation coverage in the sample app
 
 Future adapter roadmap:
 
-- `:apimirage-ktor` using the same core generation and serialization engine
-- `:apimirage-apollo` for GraphQL response mocking
-- adapter-specific diagnostics that still share the same `ApiMirageConfig` and extension model
+- `:apimirage-ktor`
+- `:apimirage-apollo`
+
+The goal is to keep one core generation engine and add thin adapter-specific integrations on top.
 
 ## Design Goals
 
 - tiny public API
 - zero behavior change when disabled
-- easy to debug in app process
+- easy to debug
 - deterministic when seeded
-- easy to extend without over-engineering the MVP
+- realistic Retrofit parsing path
+- no over-engineering for the MVP
+
