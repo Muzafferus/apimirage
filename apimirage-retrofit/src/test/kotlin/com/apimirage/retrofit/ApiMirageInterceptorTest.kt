@@ -1,7 +1,12 @@
 package com.apimirage.retrofit
 
+import com.apimirage.core.ApiMirage
 import com.apimirage.core.ApiMirageConfig
 import com.apimirage.core.ApiMirageDiagnostics
+import com.apimirage.core.fake.ApiMirageFakeValueProvider
+import com.apimirage.core.fake.ApiMirageFakeValueRequest
+import com.apimirage.core.fake.ApiMirageFakeValueResult
+import com.apimirage.core.generation.ApiMirageGenerationResult
 import okhttp3.Call
 import okhttp3.Connection
 import okhttp3.Interceptor
@@ -10,6 +15,7 @@ import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,6 +23,11 @@ import retrofit2.Invocation
 import retrofit2.http.GET
 
 public class ApiMirageInterceptorTest {
+    @After
+    public fun tearDown() {
+        ApiMirage.clearCustomizations()
+    }
+
     @Test
     public fun `interceptor returns synthetic 200 JSON when enabled`() {
         val logger = RecordingLogger()
@@ -131,6 +142,61 @@ public class ApiMirageInterceptorTest {
         assertEquals(204, response.code)
         assertTrue(logger.messages.any { it.contains("mock generation failed") })
         assertTrue(logger.messages.any { it.contains("Pass-through GET https://example.com/unsupported") })
+    }
+
+    @Test
+    public fun `registered fake value provider is used by default interceptor`() {
+        ApiMirage.registerFakeValueProvider(
+            ApiMirageFakeValueProvider { request: ApiMirageFakeValueRequest ->
+                if (request.property.declaredName == "name") {
+                    ApiMirageFakeValueResult.Provided("Custom Name")
+                } else {
+                    ApiMirageFakeValueResult.Unhandled
+                }
+            },
+        )
+        ApiMirage.install(
+            ApiMirageConfig(
+                enabled = true,
+                seed = 11L,
+                diagnostics = ApiMirageDiagnostics.LOGS,
+            ),
+        )
+        val interceptor = ApiMirageInterceptor()
+        val chain = FakeChain(request = taggedRequest("user"))
+
+        val response = interceptor.intercept(chain)
+        val body = response.body.string()
+
+        assertEquals(0, chain.proceedCalls)
+        assertTrue(body.contains("\"name\":\"Custom Name\""))
+    }
+
+    @Test
+    public fun `registered endpoint override can replace generated payload per endpoint`() {
+        ApiMirage.registerEndpointOverride { request ->
+            if (request.endpoint.operationName == "user") {
+                ApiMirageGenerationResult.Success(UserDto(id = 700L, name = "Override Name"))
+            } else {
+                null
+            }
+        }
+        ApiMirage.install(
+            ApiMirageConfig(
+                enabled = true,
+                seed = 22L,
+                diagnostics = ApiMirageDiagnostics.LOGS,
+            ),
+        )
+        val interceptor = ApiMirageInterceptor()
+        val chain = FakeChain(request = taggedRequest("user"))
+
+        val response = interceptor.intercept(chain)
+        val body = response.body.string()
+
+        assertEquals(0, chain.proceedCalls)
+        assertTrue(body.contains("\"id\":700"))
+        assertTrue(body.contains("\"name\":\"Override Name\""))
     }
 
     private fun taggedRequest(methodName: String): Request {

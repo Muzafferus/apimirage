@@ -29,7 +29,7 @@ public class ApiMirageInterceptor internal constructor(
     private val syntheticResponseFactory: RetrofitSyntheticResponseFactory = RetrofitSyntheticResponseFactory(),
     private val endpointDescriptorFactory: RetrofitEndpointDescriptorFactory = RetrofitEndpointDescriptorFactory(),
     private val logger: ApiMirageRetrofitLogger = JvmApiMirageRetrofitLogger,
-    private val extensions: ApiMirageExtensionRegistry = ApiMirageExtensionRegistry(),
+    private val extensionsProvider: () -> ApiMirageExtensionRegistry = { ApiMirage.currentExtensions() },
 ) : Interceptor {
     public constructor() : this(configProvider = { ApiMirage.currentConfig() })
 
@@ -80,7 +80,7 @@ public class ApiMirageInterceptor internal constructor(
             targetType = resolution.resolvedType.bodyType,
             random = config.newRandomSource().fork(endpoint.stableSeedKey()),
             endpoint = endpoint,
-            extensions = extensions,
+            extensions = extensionsProvider(),
         )
 
         return when (val generation = mockGenerator.generate(generationRequest)) {
@@ -162,4 +162,3 @@ public class ApiMirageInterceptor internal constructor(
         logger.log(config, message)
     }
 }
-

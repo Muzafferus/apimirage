@@ -11,5 +11,16 @@ public data class ApiMirageExtensionRegistry(
 ) {
     public val isEmpty: Boolean
         get() = fakeValueProviders.isEmpty() && endpointOverrides.isEmpty()
-}
 
+    public fun withFakeValueProvider(
+        provider: ApiMirageFakeValueProvider,
+    ): ApiMirageExtensionRegistry {
+        return copy(fakeValueProviders = fakeValueProviders + provider)
+    }
+
+    public fun withEndpointOverride(
+        override: ApiMirageEndpointOverride,
+    ): ApiMirageExtensionRegistry {
+        return copy(endpointOverrides = endpointOverrides + override)
+    }
+}
