@@ -3,6 +3,7 @@ package com.apimirage.core.generation
 import com.apimirage.core.fake.ApiMiragePropertyContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -87,6 +88,14 @@ public class DefaultApiMirageMockGeneratorTest {
         val second = generateUser(seed = 77L)
 
         assertEquals(first, second)
+    }
+
+    @Test
+    public fun `different seeds produce different nested objects`() {
+        val first = generateUser(seed = 77L)
+        val second = generateUser(seed = 78L)
+
+        assertNotEquals(first, second)
     }
 
     @Test
