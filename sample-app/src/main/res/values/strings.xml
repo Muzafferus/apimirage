@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ApiMirage Sample</string>
-    <string name="sample_status_placeholder">ApiMirage installed\nenabled=%1$s\nseed=%2$s\ndiagnostics=%3$s</string>
+    <string name="sample_title">ApiMirage Retrofit Demo</string>
+    <string name="sample_summary">ApiMirage installed\nenabled=%1$s\nseed=%2$s\ndiagnostics=%3$s</string>
+    <string name="sample_run_button">Run Demo Requests</string>
+    <string name="sample_loading">Running Retrofit demo…</string>
 </resources>
