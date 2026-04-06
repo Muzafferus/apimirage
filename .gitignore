@@ -1,5 +1,6 @@
 .gradle/
 .kotlin/
+gradle/gradle-daemon-jvm.properties
 build/
 */build/
 local.properties

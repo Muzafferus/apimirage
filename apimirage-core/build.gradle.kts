@@ -18,8 +18,8 @@ android {
 }
 
 dependencies {
+    implementation(libs.kotlin.reflect)
     implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.junit4)
 }
-
