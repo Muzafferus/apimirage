@@ -1,0 +1,23 @@
+[versions]
+agp = "9.1.0"
+kotlin = "2.3.20"
+kotlinxSerialization = "1.10.0"
+okhttp = "5.0.0"
+retrofit = "3.0.0"
+junit = "4.13.2"
+compileSdk = "36"
+minSdk = "24"
+targetSdk = "36"
+
+[libraries]
+junit4 = { group = "junit", name = "junit", version.ref = "junit" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+okhttp-logging = { group = "com.squareup.okhttp3", name = "logging-interceptor", version.ref = "okhttp" }
+retrofit = { group = "com.squareup.retrofit2", name = "retrofit", version.ref = "retrofit" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+

@@ -1,0 +1,28 @@
+plugins {
+    alias(libs.plugins.android.library)
+}
+
+android {
+    namespace = "com.apimirage.retrofit"
+    compileSdk = libs.versions.compileSdk.get().toInt()
+
+    defaultConfig {
+        minSdk = libs.versions.minSdk.get().toInt()
+        consumerProguardFiles("consumer-rules.pro")
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    api(project(":apimirage-core"))
+    api(libs.okhttp)
+    implementation(libs.retrofit)
+    implementation(libs.kotlinx.serialization.json)
+
+    testImplementation(libs.junit4)
+}
+
