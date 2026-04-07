@@ -36,7 +36,7 @@ tasks.register("closeAndReleaseCentralBundle") {
         val authToken = Base64.getEncoder()
             .encodeToString("$username:$password".toByteArray(Charsets.UTF_8))
         val endpoint =
-            "https://ossrh-staging-api.central.sonatype.com/service/local/manual/upload/defaultRepository/$namespace" +
+            "https://ossrh-staging-api.central.sonatype.com/manual/upload/defaultRepository/$namespace" +
                 "?publishing_type=automatic"
 
         val connection = java.net.URI(endpoint).toURL().openConnection() as HttpURLConnection

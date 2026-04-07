@@ -46,7 +46,7 @@ jobs:
           TOKEN="$(printf "%s:%s" "$CENTRAL_USERNAME" "$CENTRAL_PASSWORD" | base64 -w 0)"
           curl --fail --show-error --silent \
             -H "Authorization: Bearer $TOKEN" \
-            "https://ossrh-staging-api.central.sonatype.com/service/local/manual/search/repositories?ip=any&profile_id=${CENTRAL_NAMESPACE}"
+            "https://ossrh-staging-api.central.sonatype.com/manual/search/repositories?ip=any&profile_id=${CENTRAL_NAMESPACE}"
 
       - name: Publish release artifacts to Sonatype staging compatibility endpoint
         env:
